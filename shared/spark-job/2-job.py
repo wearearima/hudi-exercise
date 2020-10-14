@@ -63,7 +63,7 @@ def check_if_person(date):
 
 os.system("echo 'PROCESSING DATA...'")
 
-data = sc.wholeTextFiles("hdfs://namenode:8020/extra/insert-update")
+data = sc.wholeTextFiles("hdfs://namenode:8020/wiki/extra/insert-update")
 pages = data.flatMap(lambda x: (x[1].split('</doc>'))).map(lambda x: (get_title(x), get_date_timestamp(
     x), get_content(x))).filter(lambda x: ((len(x[0]) != 0) or (len(x[1]) != 0))).filter(lambda x: check_if_person(x[1]))
 df = pages.toDF(["title", "date", "content"])

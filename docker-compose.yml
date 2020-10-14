@@ -11,9 +11,9 @@ services:
       - "50070:50070"
       - "8020:8020"
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     volumes:
-      - ./data:/data
+      - ./data/wiki:/wiki
     networks:
       - spark-network
 
@@ -24,7 +24,7 @@ services:
     environment:
       - CLUSTER_NAME=hudi_example
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     ports:
       - "50075:50075"
       - "50010:50010"
@@ -44,7 +44,7 @@ services:
     ports:
       - "58188:8188"
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     volumes:
       - historyserver:/hadoop/yarn/timeline
     networks:
@@ -64,7 +64,7 @@ services:
     hostname: hivemetastore
     container_name: hivemetastore
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     command: /opt/hive/bin/hive --service metastore
     environment:
       SERVICE_PRECONDITION: "namenode:50070 hive-metastore-postgresql:5432"
@@ -81,7 +81,7 @@ services:
     hostname: hiveserver
     container_name: hiveserver
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     environment:
       SERVICE_PRECONDITION: "hivemetastore:9083"
     ports:
@@ -98,7 +98,7 @@ services:
     hostname: sparkmaster
     container_name: sparkmaster
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     ports:
       - "8080:8080"
       - "7077:7077"
@@ -112,7 +112,7 @@ services:
     hostname: spark-worker-1
     container_name: spark-worker-1
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     depends_on:
       - sparkmaster
     ports:
@@ -123,11 +123,12 @@ services:
       - spark-network
 
   adhoc-1:
-    image: apachehudi/hudi-hadoop_2.8.4-hive_2.3.3-sparkadhoc_2.4.4:latest
+    build:
+      context: ./docker/adhoc-1
     hostname: adhoc-1
     container_name: adhoc-1
     env_file:
-      - ./shared/config/hadoop.env
+      - ./config/hadoop.env
     depends_on:
       - sparkmaster
     ports:

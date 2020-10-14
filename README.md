@@ -1,6 +1,6 @@
 # Ejemplo práctico Apache HUDI
 
-Ejemplo práctico inspirado en el siguiente [post](http://semver.org/), en el que se habla sobre la evolución de los sistemas de almacenamiento en entornos Big Data, más concretamente de los Data Lake, y como [Apache Hudi](https://hudi.apache.org) puede ayudar en su gestión.
+Ejemplo práctico inspirado en el siguiente [post](https://blog.arima.eu/es/2020/10/20/exprimiendo-tu-data-lake-parte-I-hudi.html), en el que se habla sobre la evolución de los sistemas de almacenamiento en entornos Big Data, más concretamente de los Data Lake, y como [Apache Hudi](https://hudi.apache.org) puede ayudar en su gestión.
 
 ## Objetivo
 
@@ -11,7 +11,6 @@ Descargar una gran cantidad de entradas de la Wikipedia y identificar aquellas q
 * [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 * [Docker](https://docs.docker.com/get-docker)
 * [Docker-compose](https://docs.docker.com/compose/install)
-* [Python](https://www.python.org/downloads)
 
 ## Comenzando
 
@@ -29,7 +28,7 @@ A continuación se detallan los pasos para la consecución del ejercicio:
 ### PASO 1 - Clonar el proyecto de GitHub
 
 ~~~
-git clone http:....
+git clone https://github.com/wearearima/hudi-exercise.git
 ~~~
 
 ### PASO 2 - Arrancar cluster simulado con Docker
@@ -40,7 +39,20 @@ En el archivo `docker-compose.yml` están definidos todos los servicios necesari
 ./start.sh
 ~~~
 
-### PASO 3 - Obtención de celebridades con Apache Spark y guardarlo en HDFS (Parquet) con la herramienta Apache Hudi. 
+### PASO 3 - Copiar todos los datos de la WIKI al sistema de archivos distribuido HDFS
+
+~~~
+docker exec -it namenode /bin/bash hdfs dfs -copyFromLocal /wiki /wiki
+~~~
+
+---
+**NOTA**
+
+Se puede comprobar que el contenedor `namenode` está arrancado con el comando: `docker exec -it namenode hdfs dfsadmin -report`
+
+---
+
+### PASO 4 - Obtención de celebridades con Apache Spark y guardarlo en HDFS (Parquet) con la herramienta Apache Hudi. 
 
 Todo este proceso se encuentra en el archivo `./shared/spark-job/1-job.py`, y consta de dos partes importantes:
 
@@ -49,7 +61,7 @@ Todo este proceso se encuentra en el archivo `./shared/spark-job/1-job.py`, y co
     ```python
     ...
 
-    data = sc.wholeTextFiles("hdfs://namenode:8020/wiki/*")
+    data = sc.wholeTextFiles("hdfs://namenode:8020/wiki/wiki_*")
     pages = data.flatMap(lambda x: (x[1].split('</doc>'))).map(lambda x: (get_title(x), get_date_timestamp(
         x), get_content(x))).filter(lambda x: ((len(x[0]) != 0) or (len(x[1]) != 0))).filter(lambda x: check_if_person(x[1]))
     df = pages.toDF(["title", "date", "content"])
@@ -124,9 +136,11 @@ Una vez dentro, comprobar que:
     B) Verificar primer commit
 
     - hudi:hudi_celebrities-> `commits show  --desc true`<br/><br/>![Alt text](images/hudi-commits.png)
+    <br/><br/>
+    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
 
 
-### PASO 4 - Realizar modificaciones insert y update en el set de datos
+### PASO 5 - Realizar modificaciones insert y update en el set de datos
 
 Ejecutar un nuevo proceso que realice modificaciones sobre los datos. A diferencia del anterior este cargara un sólo archivo de texto con 2 celebridades:
 
@@ -163,6 +177,7 @@ Una vez dentro, comprobar que:
     - root@adhoc-1:/# `$SPARK_INSTALL/bin/pyspark --driver-class-path /opt/hive/conf --packages org.apache.hudi:hudi-spark-bundle_2.11:0.6.0,org.apache.spark:spark-avro_2.11:2.4.4 --conf spark.sql.hive.convertMetastoreParquet=false`<br/><br/>![Alt text](images/shell-pyspark.png)
     - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='New Celebritie'").show(1, False)`<br/><br/>![Alt text](images/new-celebritie.png)
     - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Clara Petacci'").show(1, False)`<br/><br/>![Alt text](images/updated-celebritie.png)
+    - &#62;&#62;&#62; `exit()`
 
 2. La biblioteca HUDI ha realizado toda la gestión automáticamente:
 
@@ -176,8 +191,10 @@ Una vez dentro, comprobar que:
     B) Información del commit realizado
 
     - hudi:hudi_celebrities-> `commit showfiles --commit 20201013214314`<br/><br/>![Alt text](images/info-commit-2.png)
+    <br/><br/>
+    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
 
-### PASO 5 - Eliminar una de las celebridades del set de datos
+### PASO 6 - Eliminar una de las celebridades del set de datos
 
 Este proceso cargará un archivo de texto con la celebridad que se desea eliminar.
 
@@ -220,6 +237,7 @@ Una vez dentro, comprobar que:
 
     - root@adhoc-1:/# `$SPARK_INSTALL/bin/pyspark --driver-class-path /opt/hive/conf --packages org.apache.hudi:hudi-spark-bundle_2.11:0.6.0,org.apache.spark:spark-avro_2.11:2.4.4 --conf spark.sql.hive.convertMetastoreParquet=false`
     - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Clara Petacci'").show(1, False)`<br/><br/>![Alt text](images/delete-celebritie.png)
+    - &#62;&#62;&#62; `exit()`
 
 2. La biblioteca HUDI ha realizado toda la gestión automáticamente:
 
@@ -233,9 +251,10 @@ Una vez dentro, comprobar que:
     B) Información del commit realizado
 
     - hudi:hudi_celebrities-> `commit showfiles --commit 20201013214621`<br/><br/>![Alt text](images/info-commit-3.png)
+    <br/><br/>
+    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
 
-
-### PASO 6 - Parar cluster simulado con Docker
+### PASO 7 - Parar cluster simulado con Docker
 
 Una vez terminado el ejercicio, borrar todos los contenedores que están simulando un cluster con Docker. Para pararlos ejecutar el script:
 
