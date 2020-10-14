@@ -1,0 +1,16 @@
+// Hoodie Banner 1.2.0.RELEASE log opened at 2020-10-13 05:37:18
+connect --path hdfs://namenode:8020/wiki/hudi_celebrities
+desc
+commits show --sortBy "Total Bytes Written" --desc true --limit 10
+show fsview all
+exit
+// Hoodie Banner 1.2.0.RELEASE log closed at 2020-10-13 05:48:56
+// Hoodie Banner 1.2.0.RELEASE log opened at 2020-10-13 05:49:40
+connect --path hdfs://namenode:8020/wiki/hudi_celebrities
+commit showpartitions --commit 20201008134159  --sortBy "Total Bytes Written" --desc true --limit 10
+commit showfiles --commit 20201008134159 --sortBy "Partition Path"
+stats w
+stats wa
+// [failed] compactions show all
+exit
+// Hoodie Banner 1.2.0.RELEASE log closed at 2020-10-13 05:59:31
