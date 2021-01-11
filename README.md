@@ -1,73 +1,73 @@
-# Ejemplo práctico Apache HUDI
+# Example exercise with Apache HUDI
 
-Ejemplo práctico inspirado en el siguiente [post](https://blog.arima.eu/es/2020/10/20/exprimiendo-tu-data-lake-parte-I-hudi.html), en el que se habla sobre la evolución de los sistemas de almacenamiento en entornos Big Data, más concretamente de los Data Lake, y como [Apache Hudi](https://hudi.apache.org) puede ayudar en su gestión.
+An example exercise that puts into practice the ideas explained in the following [post](https://blog.arima.eu/en/2020/10/20/exprimiendo-tu-data-lake-parte-I-hudi.html), which talks about the evolution of storage systems in Big Data environments, specifically Data Lakes, and how [Apache Hudi](https://hudi.apache.org) can help to manage them.
 
-## Objetivo
+## Aim
 
-Descargar una gran cantidad de entradas de la Wikipedia y identificar aquellas que sean celebridades a través de un proceso en Apache Spark. El resultado almacenarlo en HDFS en archivos con formato Parquet haciendo uso de la herramienta Apache Hudi. Una vez completada esta operación, llevar a cabo una serie de actualizaciones sobre los datos, verificando que Hudi genera y compacta los nuevos archivos de manera eficiente, comprobando en cada operación su "lineage", para saber qué modificaciones han ido sufriendo.
+To download a large number of Wikipedia entries and identify those that are about celebrities through an Apache Spark process. Store the result in HDFS as Parquet files using the Apache Hudi tool. Once the operation is completed, carry out a series of updates on the data to verify that Hudi generates and compacts the new files efficiently, checking the lineage of each operation for the modifications which have been made.
 
-## Pre-requisitos
+## Prerequisites
 
 * [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 * [Docker](https://docs.docker.com/get-docker)
 * [Docker-compose](https://docs.docker.com/compose/install)
 
-## Comenzando
+## Starting
 
-Simularemos un cluster con la ayuda de la herramienta Docker (junto a docker-compose) para configurar y ejecutar los servicios necesarios:
+We will run a Hadoop cluster in Docker containers (orchestrated by docker-compose) to configure and execute all the necessary services:
 
-* [HADOOP HDFS](https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html) - Sistema de almacenamiento distribudio HDFS
-* [APACHE HIVE](https://hive.apache.org) - Infraestructura de almacenamiento de datos construida sobre Hadoop para proporcionar agrupación, consulta, y análisis de datos
-* [APACHE SPARK](https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html) - Framework para la computación en un clúster
-* [APACHE HUDI](https://hudi.apache.org) - Herramienta para ingerir y administrar el almacenamiento de grandes conjuntos de datos analíticos a través de sistemas de archivos distribuidos
+* [HADOOP HDFS](https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html) - HDFS distributed file system.
+* [APACHE HIVE](https://hive.apache.org) - Data storage infrastructure built on top of Hadoop for grouping, querying and data analytics.
+* [APACHE SPARK](https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html) - Distributed computing framework.
+* [APACHE HUDI](https://hudi.apache.org) - Tool for ingesting and storing large analytical data sets across distributed file systems.
 
-## Ejercicio
+## Exercise
 
-A continuación se detallan los pasos para la consecución del ejercicio:
+Here are the steps to launch the exercise:
 
-### PASO 1 - Clonar el proyecto de GitHub
+### STEP 1 - Clone the project from GitHub
 
 ~~~
 git clone https://github.com/wearearima/hudi-exercise.git
 ~~~
 
-### PASO 2 - Arrancar cluster simulado con Docker
+### STEP 2 - Initialize the cluster
 
-En el archivo `docker-compose.yml` están definidos todos los servicios necesarios para poder simular este cluster con Docker. Para arrancarlo ejecutar el script:
+All the necessary services are defined in the `docker-compose.yml` file. Run the following script to initialize the cluster:
 
 ~~~
 ./start.sh
 ~~~
 
-### PASO 3 - Copiar todos los datos de la WIKI al sistema de archivos distribuido HDFS
+### STEP 3 - Copy all the data from WIKI to the HDFS distributed file system
 
 ~~~
 docker exec -it namenode /bin/bash hdfs dfs -copyFromLocal /wiki /wiki
 ~~~
 
 ---
-**NOTA**
+**NOTE**
 
-Se puede comprobar que el contenedor `namenode` está arrancado con el comando: `docker exec -it namenode hdfs dfsadmin -report`
+You can check if the container `namenode` is already launched with the command: `docker exec -it namenode hdfs dfsadmin -report`
 
 ---
 
-### PASO 4 - Obtención de celebridades con Apache Spark y guardarlo en HDFS (Parquet) con la herramienta Apache Hudi. 
+### STEP 4 - Search for the celebrities with Apache Spark and save them to HDFS (Parquet) using the Apache Hudi tool. 
 
-Todo este proceso se encuentra en el archivo `./shared/spark-job/1-job.py`, y consta de dos partes importantes:
+The Spark job is located in `./shared/spark-job/1-job.py` and it has two important parts:
 
-1. Filtrado y obtención de celebridades. Esta discriminación se realiza buscando en cada una de las entradas de la Wikipedia el primer texto que tenga formato de tipo fecha dentro de su contenido.
+1. Filter and obtain celebrities. We consider that a Wikipedia entry is a celebrity if there is a date within the first 150 characters of its content (this has been heavily inspired by the following [post](https://towardsdatascience.com/process-wikipedia-using-apache-spark-to-create-spicy-hot-datasets-1a59720e6e25))
 
     ```python
     ...
 
     data = sc.wholeTextFiles("hdfs://namenode:8020/wiki/wiki_*")
-    pages = data.flatMap(lambda x: (x[1].split('</doc>'))).map(lambda x: (get_title(x), get_date_timestamp(
-        x), get_content(x))).filter(lambda x: ((len(x[0]) != 0) or (len(x[1]) != 0))).filter(lambda x: check_if_person(x[1]))
+    pages = data.flatMap(lambda x: (x[1].split('</doc>'))).map(lambda x: (Utils.get_title(x), Utils.get_date_timestamp(
+        x), Utils.get_content(x))).filter(lambda x: ((len(x[0]) != 0) or (len(x[1]) != 0))).filter(lambda x: Utils.check_if_person(x[1]))
     df = pages.toDF(["title", "date", "content"])
     df = df.select('title', to_date(df.date, 'MM/dd/yyyy').alias('date'), "content")
     ```
-    (INFORMATIVO) Esta parte dará como resultado un DataFrame `df` de Spark con el siguiente esquema:
+    (NOTE) The result of this execution will be a Spark DataFrame `df` with the following schema:
     ~~~
     >>> df.printSchema()
     root
@@ -76,7 +76,7 @@ Todo este proceso se encuentra en el archivo `./shared/spark-job/1-job.py`, y co
     |-- content: string (nullable = true)
     ~~~
 
-2. Transformar el DataFrame `df` en archivos de tipo Parquet y guardarlos en el almacenamiento HDFS con la herramienta Apache Hudi.
+2. Transform the Dataframe `df` into a Parquet file and save it to HDFS using Apache Hudi.
 
     ```python
     tableName = "hudi_celebrities"
@@ -101,13 +101,13 @@ Todo este proceso se encuentra en el archivo `./shared/spark-job/1-job.py`, y co
     df.write.format("hudi").options(**hudi_options).mode("overwrite").save(basePath)
     ```
 
-    En la configuración de `hudi_options` hay que destacar los siguientes aspectos:
+    These are the most important parts of the above `hudi_options`:
 
-    * Tipo de tabla `COPY_ON_WRITE`, que es una de las opciones, junto a `MERGE_ON_READ`, que ofrece HUDI para gestionar sus tablas. Más información en su [documentación oficial](https://hudi.apache.org/docs/concepts.html#table-types).
-    * Las propiedades del tipo `hoodie.datasource.hive...` configuran HUDI para que genere automáticamente una tabla en HIVE `hudi_celebrities`, con la que posteriormente poder realizar consultas tipo SQL sobre los datos.
-    * Modo `overwrite` para que en caso de que ya exista la carpeta `hdfs://namenode:8020/wiki/hudi_celebrities` la elimine y vuelva a generar los datos desde el principio.
+    * Table type `COPY_ON_WRITE` is one of the options HUDI offers for managing their tables. You can get more information about the different Hudi table types in the [official documentation](https://hudi.apache.org/docs/concepts.html#table-types).
+    * The properties of type `hoodie.datasource.hive ...` configure HUDI to automatically generate a HIVE table, with which you can query the data using SQL.
+    * `Overwrite` mode is used, so if the folder `hdfs://namenode:8020/wiki/hudi_celebrities` already exists, Hudi will delete it and generate the data again from scratch.
 
-Ejecutar primer proceso:
+Launch the first process:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash spark-submit \
@@ -116,38 +116,38 @@ docker exec -it adhoc-1 /bin/bash spark-submit \
 /var/hoodie/ws/spark-job/1-job.py
 ~~~
 
-Las verificaciones del resultado del proceso se hacen dentro del contenedor `adhoc-1`:
+Check the results inside the `adhoc-1` container:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash
 ~~~
 
-Una vez dentro, comprobar que:
+Once inside, check:
 
-1. La biblioteca de HUDI administra de manera efectiva este conjunto de datos:
+1. That the HUDI library managed the merging of datasets effectively:
 
     - root@adhoc-1:/# `/var/hoodie/ws/hudi-cli/hudi-cli.sh`
     - hudi-> `connect --path hdfs://namenode:8020/wiki/hudi_celebrities`<br/><br/>![Alt text](images/hudi-cli.png)
 
-    A) Descripción de la tabla HUDI
+    A) HUDI table description
 
     - hudi:hudi_celebrities-> `desc`<br/><br/>![Alt text](images/hudi-desc.png)
        
-    B) Verificar primer commit
+    B) Verify first commit
 
     - hudi:hudi_celebrities-> `commits show  --desc true`<br/><br/>![Alt text](images/hudi-commits.png)
     <br/><br/>
-    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
+    > **_NOTE:_**  You can exit the HUDI client by typing: `exit`
 
 
-### PASO 5 - Realizar modificaciones insert y update en el set de datos
+### STEP 5 - Make insert and update modifications to the dataset
 
-Ejecutar un nuevo proceso que realice modificaciones sobre los datos. A diferencia del anterior este cargara un sólo archivo de texto con 2 celebridades:
+Run a new process to modify the data. Unlike the previous one, this will just load a text file with 2 celebrities:
 
-1. Nueva celebridad que se añadirá a los datos actuales
-2. Celebridad que ya existe, y por lo tanto, será modificada en el set de datos
+1. A new celebrity that needs to be added to the existing dataset.
+2. A celebrity that already exists in the dataset but has been updated.
 
-El proceso se encuentra en el archivo `spark-job/2-job.py` y es igual al primero, exceptuando el modo de escritura, que en este caso es `append`:
+The process is in the file `spark-job/2-job.py` and is pretty similar to the previous one, except that in this case the writing mode is `append` because we are updating an existing Hudi table.
 
 ```python
 ....
@@ -155,7 +155,7 @@ El proceso se encuentra en el archivo `spark-job/2-job.py` y es igual al primero
 df.write.format("hudi").options(**hudi_options).mode("append").save(basePath)
 ```
 
-Ejecutar segundo proceso:
+Run the second process:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash spark-submit \
@@ -164,41 +164,41 @@ docker exec -it adhoc-1 /bin/bash spark-submit \
 /var/hoodie/ws/spark-job/2-job.py
 ~~~
 
-Las verificaciones del resultado del proceso se hacen dentro del contenedor `adhoc-1`:
+Once again, we will check the results inside the `adhoc-1` container:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash
 ~~~
 
-Una vez dentro, comprobar que:
+Once inside the container, check:
 
-1. Se ha insertado una nueva celebridad (New Celebritie) y se ha modificado una existente (Clara Petacci):
+1. That a new celebrity has been inserted (New Celebrity) and an existing one has been modified (Dean Koontz):
 
     - root@adhoc-1:/# `$SPARK_INSTALL/bin/pyspark --driver-class-path /opt/hive/conf --packages org.apache.hudi:hudi-spark-bundle_2.11:0.6.0,org.apache.spark:spark-avro_2.11:2.4.4 --conf spark.sql.hive.convertMetastoreParquet=false`<br/><br/>![Alt text](images/shell-pyspark.png)
     - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='New Celebritie'").show(1, False)`<br/><br/>![Alt text](images/new-celebritie.png)
-    - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Clara Petacci'").show(1, False)`<br/><br/>![Alt text](images/updated-celebritie.png)
+    - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Dean Koontz'").show(1, False)`<br/><br/>![Alt text](images/updated-celebritie.png)
     - &#62;&#62;&#62; `exit()`
 
-2. La biblioteca HUDI ha realizado toda la gestión automáticamente:
+2. That the HUDI library has managed everything automatically:
 
     - root@adhoc-1:/# `/var/hoodie/ws/hudi-cli/hudi-cli.sh`
     - hudi-> `connect --path hdfs://namenode:8020/wiki/hudi_celebrities`    
 
-    A) Verificar segundo commit:
+    A) Verify the second commit:
 
     - hudi:hudi_celebrities-> `commits show  --desc true`<br/><br/>![Alt text](images/hudi-commits-2.png)
         
-    B) Información del commit realizado
+    B) Check commit information
 
     - hudi:hudi_celebrities-> `commit showfiles --commit 20201013214314`<br/><br/>![Alt text](images/info-commit-2.png)
     <br/><br/>
-    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
+    > **_NOTE:_**  You can exit the HUDI client by typing: `exit`
 
-### PASO 6 - Eliminar una de las celebridades del set de datos
+### STEP 6 - Delete one of the celebrities from the dataset
 
-Este proceso cargará un archivo de texto con la celebridad que se desea eliminar.
+This process will load a file that includes the celebrity to be deleted.
 
-El proceso `./shared/spark-job/3-job.py`, es prácticamente el mismo a los anteriores, pero se configura de manera diferente para eliminar datos `hudi_delete_options`:
+The process `./shared/spark-job/3-job.py`, is practically the same as the previous ones, but it is configured to delete data `hudi_delete_options`:
 
 ```python
 ....
@@ -216,7 +216,7 @@ hudi_delete_options = {
 }
 ```
 
-Ejecutar tercer proceso:
+Run the third process:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash spark-submit \
@@ -225,46 +225,39 @@ docker exec -it adhoc-1 /bin/bash spark-submit \
 /var/hoodie/ws/spark-job/3-job.py
 ~~~
 
-Las verificaciones del resultado del proceso se hacen dentro del contenedor `adhoc-1`:
+Check the results inside the `adhoc-1` container:
 
 ~~~
 docker exec -it adhoc-1 /bin/bash
 ~~~
 
-Una vez dentro, comprobar que:
+Once inside, check:
 
-1. Se ha eliminado la celebridad (Clara Petacci):
+1. That the celebrity has been removed (Dean Koontz):
 
     - root@adhoc-1:/# `$SPARK_INSTALL/bin/pyspark --driver-class-path /opt/hive/conf --packages org.apache.hudi:hudi-spark-bundle_2.11:0.6.0,org.apache.spark:spark-avro_2.11:2.4.4 --conf spark.sql.hive.convertMetastoreParquet=false`
-    - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Clara Petacci'").show(1, False)`<br/><br/>![Alt text](images/delete-celebritie.png)
+    - &#62;&#62;&#62; `spark.sql("select title, date, content from hudi_celebrities where title='Dean Koontz'").show(1, False)`<br/><br/>![Alt text](images/delete-celebritie.png)
     - &#62;&#62;&#62; `exit()`
 
-2. La biblioteca HUDI ha realizado toda la gestión automáticamente:
+2. That the HUDI library was able to manage everything automatically:
 
     - root@adhoc-1:/# `/var/hoodie/ws/hudi-cli/hudi-cli.sh`
     - hudi-> `connect --path hdfs://namenode:8020/wiki/hudi_celebrities`    
 
-    A) Verificar tercer commit:
+    A) Verify that a third commit exists:
 
     - hudi:hudi_celebrities-> `commits show  --desc true`<br/><br/>![Alt text](images/hudi-commits-3.png)
         
-    B) Información del commit realizado
+    B) Check the commit information
 
     - hudi:hudi_celebrities-> `commit showfiles --commit 20201013214621`<br/><br/>![Alt text](images/info-commit-3.png)
     <br/><br/>
-    > **_NOTA:_**  Para salir del cliente HUDI: `exit`
+    > **_NOTE:_**  You can exit the HUDI client by typing: `exit`
 
-### PASO 7 - Parar cluster simulado con Docker
+### STEP 7 - Stop the cluster
 
-Una vez terminado el ejercicio, borrar todos los contenedores que están simulando un cluster con Docker. Para pararlos ejecutar el script:
+Once the exercise is finished, execute the following script to stop all Docker containers that are simulating the cluster:
 
 ~~~
 ./stop.sh
 ~~~
-
-
-## Conclusiones
-
-Hemos visto como con Apache Hudi se pueden llegar a realizar operaciones de inserción, modificación y eliminación de los datos en archivos de tipo Parquet (y Avro, si trabajamos con el tipo de tabla `MERGE_ON_READ`) de manera eficiente, sin tener que preocuparse de la gestión de estos archivos. Además ofrece metadata adicional para tener un <i>lineage</i> completo de las modificaciones que han sufrido. El ejemplo se ha basado en un ejercicio práctico en el que se ha utilizado el módulo `hudi-spark` que ofrece una <i>API Datasource</i> con el que se puede escribir (y leer) un Dataframe de Spark en una tabla Hudi. No obstante, dispone de otro módulo llamado <i>DeltaStreamer</i> con el que se puede trabajar con fuentes de streaming, como puede ser Apache Kakfa. Puede encontrar más información [aquí](https://hudi.apache.org/docs/writing_data.html).
-
-
